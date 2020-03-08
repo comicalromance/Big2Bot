@@ -1,6 +1,7 @@
 const Telegraf = require("telegraf");
 const Extra = require('telegraf/extra')
 const Markup = require('telegraf/markup')
+const Express = require("express")
 
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
@@ -17,6 +18,17 @@ mongoose.connect(db_uri, {useNewUrlParser: true, useCreateIndex: true });
 const connection = mongoose.connection;
 connection.once('open', () => {
 	console.log("MongoDB connection established");
+});
+
+const app = Express();
+app.set('port', (process.env.PORT || 5000));
+
+//For avoidong Heroku $PORT error
+app.get('/', function(request, response) {
+    var result = 'App is running'
+    response.send(result);
+}).listen(app.get('port'), function() {
+    console.log('App is running, server is listening on port ', app.get('port'));
 });
 
 bot.use(async (ctx, next) => {
