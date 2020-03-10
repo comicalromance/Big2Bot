@@ -48,7 +48,7 @@ function listPlayers(chat_id, ctx) {
 				throw("No game detected");
 			}
 			for(const i of game.user_list) {
-				msg += `<a href="tg://user?id=${i["user_id"]}">${i["user_name"]}</a><pre>\n</pre>`;
+				msg += `<a href="tg://user?id=${i.user_id}">${i.user_name}</a><pre>\n</pre>`;
 				console.log(i["user_name"])
 			}
 			ctx.replyWithHTML(msg);
