@@ -6,7 +6,7 @@ const userSchema = new Schema({
 	user_id: { type: String, required: true},
 	chat_id: { type: String, required: true},
 	chat_title: {type: String, required: true},
-	total_whacks: {type: Number}
+	total_wins: {type: Number}
 }, {
 	timestamps: true
 });

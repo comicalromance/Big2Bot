@@ -30,6 +30,12 @@ function convertToString(Card) {
     return cardString;
 }
 
+function find3Dim(Hand) {
+    for(let Card of Hand) {
+        if(Card.number == 3 && Card.suit == "Diamond") return true;
+    }
+    return false;
+}
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
@@ -48,8 +54,8 @@ function generateDeck() {
     return shuffleArray(shuffleArray(Deck));
 }
 
-function generateHands(Deck, players) {
-    let Hands = [], Hand = [], handSize = deckSize/players;
+function generateHands(players) {
+    let Hands = [], Hand = [], handSize = deckSize/players, Deck = generateDeck();
     for(let i=0; i<players; i++) {
         for(let j=0; j<handSize; j++) {
             Hand.push(Deck[i*handSize + j]);
@@ -85,9 +91,9 @@ function generateSuitHistogram(Hand) {
     return Histogram;
 }
 
-function generatePairs(Hand) {
+function generatePairs(Hand, Limit = 3) {
     let Pairs = [], Histogram = generateHistogram(Hand);
-    for(let i = 3; i<16; i++) {
+    for(let i = Limit; i<16; i++) {
         if(Histogram[i].length == 2) {
             Pairs.push([Histogram[i][0], Histogram[i][1]]);
         }
@@ -108,6 +114,16 @@ function generatePairs(Hand) {
     return Pairs;
 }
 
+function generateSingles(Hand, Limit = 3, Suit) {
+    let Singles = [], SuitVal;
+    if(!Suit) SuitVal = 0;
+    else SuitVal = SuitValues[Suit];
+    for(let i=Hand.length-1; i >= 0; i--) {
+        if(Hand[i].number > Limit ) Singles.push(Hand[i]);
+        else if(Hand[i].number == Limit && SuitValues[Hand[i].suit] > SuitVal) Singles.push(Hand[i]);
+    }
+    return Singles;
+}
 function generateStraight(Hand, Limit) {
     let Stack = [], Straight = [], Histogram = generateHistogram(Hand);
     if(Limit >= 7) Limit -= 4;
@@ -178,9 +194,8 @@ function generateFlush(Hand, SuitLimit) {
     return Flush;
 }
 
-function generateHouse(Hand, Limit) {
+function generateHouse(Hand, Limit=3) {
     let House = [], Histogram = generateHistogram(Hand);
-    if(!Limit) Limit = 3;
     for(let i = Limit; i<16; i++) {
         if(Histogram[i].length >= 3) {
             for(let j = 3; j<16; j++) {
@@ -234,11 +249,10 @@ function generateSets(Hand, Set) {
 }
 
 
-let deck = generateDeck();
-let hands = generateHands(deck, 4);
+let hands = generateHands(4);
 sortHand(hands[0]);
 let pairs = generatePairs(hands[0]);
 let flush = generateFlush(hands[0]);
 
-
+module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets}
 

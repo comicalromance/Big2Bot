@@ -11,6 +11,7 @@ const bot = new Telegraf(process.env.BOT_TOKEN);
 
 let User = require('./models/user.model');
 let Game = require('./models/game.model');
+let Eng = require('./game');
 
 const db_uri = process.env.ATLAS_URI;
 mongoose.connect(db_uri, {useNewUrlParser: true, useCreateIndex: true });
@@ -39,7 +40,7 @@ bot.use(async (ctx, next) => {
   console.log(ctx.message)
 })
 
-function listPlayers(chat_id, ctx) {
+function listPlayers(chat_id) {
 	let msg = "Current Players:<pre>\n</pre>";
 	Game.findOne({chat_id: chat_id, game_status: {$ne: 4}})
 		.then(game => {
@@ -51,7 +52,7 @@ function listPlayers(chat_id, ctx) {
 				msg += `<a href="tg://user?id=${i.user_id}">${i.user_name}</a><pre>\n</pre>`;
 				console.log(i["user_name"])
 			}
-			ctx.replyWithHTML(msg);
+			bot.telegram.sendMessage(chat_id, msg, {parse_mode: 'HTML'});
 		})
 		.catch(err => msg = err)
 }
@@ -101,35 +102,120 @@ function findMostVoted(options) {
 	return maxUser;
 }
 
+function startGame(chat_id) {
+	let currentPlayer, hands = Eng.generateHands(4);
+	Game.findOne({chat_id: chat_id, game_status: 2})
+		.then(game => {
+			if(!game) {
+				bot.telegram.sendMessage(chat_id, "ERROR: Game not found");
+				throw("Game not found");
+			}
+			for(let i=0; i<game.user_list.length; i++) {
+				game.user_list[i].user_hand = Eng.sortHand(hands[i]);
+				if(!game.current_user && Eng.find3Dim(hands[i])) {
+					game.current_user = i;
+					currentPlayer = {"user_id": game.user_list[i].user_id, "user_name": game.user_list[i].user_name}
+				}
+			}
+			game.save();
+		})
+		.then(() => {
+			bot.telegram.sendMessage(chat_id, `The starting player is <a href="tg://user?id=${currentPlayer.user_id}">${currentPlayer.user_name}</a>!`, {parse_mode: 'HTML'});
+		})
+		.catch(err => console.log(err));
+}
+
+bot.hears(/^\/start[ =](.+)$/, (ctx) => {
+	let user_id = ctx.message.from.id;
+	let user_name = ctx.message.from.first_name + " " + ctx.message.from.last_name;
+	let chat_id = ctx.match[1];
+	let chat_title = ctx.message.from.id;
+	let total_wins = 0;
+	let game_start = false;
+
+	User.findOne({user_id: user_id})
+		.then(users => {
+			if(!users) {
+				const newUser = new User({ 
+					user_id, 
+					chat_id, 
+					chat_title,
+					total_wins
+				});
+				return newUser.save();
+			}
+		})
+		.then(() => {return Game.findOne({chat_id: chat_id, game_status: {$ne: 4} }) } )
+		.then(games => {
+			if(games == null) {
+				ctx.reply("No ongoing game!");
+				throw("No ongoing game");
+			}
+			chat_title = games.chat_title;
+			if(games.game_status != 1) {
+				ctx.reply(`Unable to join game in ${chat_title}!`);
+				throw("Unable to join game!");
+			}
+			else {
+				if(checkUserinList(games.user_list, user_id)) {
+					ctx.reply(`Already in Game in ${chat_title}!`);
+					throw("Already in Game!");
+				}
+				else {
+					let user_hand = [];
+					const list = {"user_id": user_id, "user_name": user_name, "user_hand": user_hand};
+					games.user_list.push(list);
+					if(games.user_list.length == 4) {
+						games.game_status = 2;
+						game_start = true;
+					}
+					return games.save();
+				}
+			}
+		})
+		.then(() => {
+			ctx.replyWithHTML(`Joined game in <b>${chat_title}!</b>`);
+			bot.telegram.sendMessage(chat_id, `<a href="tg://user?id=${user_id}">${user_name}</a> has joined the game!`, {parse_mode: 'HTML'});
+			listPlayers(chat_id);
+		})
+		.then(() => {if(game_start) startGame(chat_id);})
+		.catch(err => console.log(err));
+});
+
 bot.command('start' , (ctx) => {
 	let user_id = ctx.message.from.id;
-	let chat_id = ctx.message.chat.id;
-	let chat_title = ctx.message.chat.title;
-	let total_whacks = 0;
 	let user_list = [];
 
 	if(ctx.message.chat.type == 'private') {
+		let chat_id = ctx.message.from.id;
+		let chat_title = ctx.message.from.id;
+		let total_wins = 0;
 		User.findOne({user_id: user_id})
 			.then(users => {
-				if (users ) ctx.reply('hi!');
+				if (users) ctx.reply('hi!');
 				else {
 					const newUser = new User({ 
 						user_id, 
 						chat_id, 
 						chat_title,
-						total_whacks
+						total_wins
 					});
 					newUser.save();
 				}	
 			})
+			.catch(err => console.log(err));
 	}
 
 	else {
-		chat_id = ctx.message.chat.id;
-		chat_title = ctx.message.chat.title;
-		Game.findOne({chat_id: chat_id, game_status: {$ne: 4}})
+		let chat_id = ctx.message.chat.id;
+		let chat_title = ctx.message.chat.title;
+		Game.findOne({chat_id: chat_id, game_status: 1})
 			.then(games => {
-				if(games) ctx.reply(`Game in ${chat_title} already started!`);
+				if(games) {
+					ctx.reply(`Game in ${chat_title} already started!`, Markup.inlineKeyboard([
+						Markup.urlButton('Start', `https://t.me/SGBig2Bot?start=${chat_id}`)
+					]).extra());
+				}
 				else {
 					let game_status = 1;
 					const newGame = new Game({
@@ -139,7 +225,11 @@ bot.command('start' , (ctx) => {
 						user_list,
 					});
 					newGame.save()
-						.then(() => ctx.reply('Join the Whacking by typing /join!'))
+						.then(() => {
+							ctx.replyWithHTML('Join the game of <b>Big2</b> by pressing Start below!', Markup.inlineKeyboard([
+								Markup.urlButton('Start', `https://t.me/SGBig2Bot?start=${chat_id}`)
+							]).extra())
+						})
 						.catch(err => console.log(err))
 				}
 			})
@@ -178,18 +268,7 @@ bot.command('join', ctx => {
 	let user_hand = [];
 	let game_start = false;
 
-	User.findOne({user_id: user_id})
-		.then(users => {
-			if(users == null) {
-				ctx.reply("Please enter the command /start on my bot at this link!", Markup.inlineKeyboard([
-					Markup.urlButton('Start', 'https://t.me/DaTaaaaaBot}')
-				]).extra());
-				throw("User not registered");
-			}
-			else {
-				return Game.findOne({chat_id: chat_id, game_status: 1 });
-			}
-		})
+	Game.findOne({chat_id: chat_id, game_status: 1})
 		.then(games => {
 			if(games == null) {
 				ctx.reply("No ongoing game!");
@@ -205,21 +284,11 @@ bot.command('join', ctx => {
 					throw("Already in Game!");
 				}
 				else {
-					const list = {"user_id": user_id, "user_name": user_name, "user_hand": user_hand};
-					games.user_list.push(list);
-					if(games.user_list.length == 4) {
-						game_status = 2;
-						game_start = true;
-					}
-					return games.save();
+					ctx.replyWithHTML("Join the game of <b>Big2</b> by pressing Start below!", Markup.inlineKeyboard([
+						Markup.urlButton('Start', `https://t.me/SGBig2Bot?start=${chat_id}`)
+					]).extra());
 				}
 			}
-		})
-		.then(() => {
-			ctx.replyWithHTML(`<a href="tg://user?id=${user_id}">${user_name}</a> has joined the whacking!`);
-			listPlayers(chat_id, ctx);
-			bot.telegram.sendMessage(user_id, `Joined game in <b>${chat_title}!</b>`, parse_mode="HTML");
-			if(game_start) startGame(ctx);
 		})
 		.catch(err => console.log(err));
 });
@@ -305,7 +374,7 @@ bot.command('viewstats', ctx => {
 	let user_name = ctx.message.from.first_name + " " + ctx.message.from.last_name;
 	User.findOne({user_id: user_id})
 		.then(user => {
-			ctx.reply(`${user_name} has a total of ${user.total_whacks} whacks!`);
+			ctx.reply(`${user_name} has a total of ${user.total_wins} wins!`);
 		})
 		.catch(err => console.log(err));
 })

@@ -14,7 +14,17 @@ const gameSchema = new Schema({
 			suit: String
 		}]
 	}],
-	current_user: String
+	current_user: Number,
+	current_hand: [{
+		type: String,
+		number: Number,
+		suit: String,
+		hand: [{
+			number: Number,
+			suit: String
+		}]
+	}],
+	winning_user: Number
 }, {
 	timestamps: true
 });
