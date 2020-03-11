@@ -175,7 +175,8 @@ bot.command('join', ctx => {
 	let chat_title = ctx.message.chat.title;
 	let user_id = ctx.message.from.id;
 	let user_name = ctx.message.from.first_name + " " + ctx.message.from.last_name;
-	let user_whacked = 0;
+	let user_hand = [];
+	let game_start = false;
 
 	User.findOne({user_id: user_id})
 		.then(users => {
@@ -199,37 +200,26 @@ bot.command('join', ctx => {
 				throw("Unable to join game!");
 			}
 			else {
-				//return Game.findOne({"user_list.user_id": user_id})
 				if(checkUserinList(games.user_list, user_id)) {
 					ctx.reply("Already in Game!");
 					throw("Already in Game!");
 				}
 				else {
-					const list = {"user_id": user_id, "user_name": user_name, "user_whacked": user_whacked};
+					const list = {"user_id": user_id, "user_name": user_name, "user_hand": user_hand};
 					games.user_list.push(list);
+					if(games.user_list.length == 4) {
+						game_status = 2;
+						game_start = true;
+					}
 					return games.save();
 				}
 			}
 		})
-		/*.then(game_users => {
-			if(game_users) {
-				ctx.reply("Already in Game!");
-				throw("Already in Game!");
-			}
-			else {
-				console.log(game_users);
-				return Game.findOne({chat_id: chat_id })
-			}
-		})
-		.then(game => {
-			const list = {"user_id": user_id, "user_name": user_name, "user_whacked": user_whacked};
-			game.user_list.push(list);
-			return game.save()
-		})*/
 		.then(() => {
 			ctx.replyWithHTML(`<a href="tg://user?id=${user_id}">${user_name}</a> has joined the whacking!`);
 			listPlayers(chat_id, ctx);
-			bot.telegram.sendMessage(user_id, `Joined game in ${chat_title}`);
+			bot.telegram.sendMessage(user_id, `Joined game in <b>${chat_title}!</b>`, parse_mode="HTML");
+			if(game_start) startGame(ctx);
 		})
 		.catch(err => console.log(err));
 });

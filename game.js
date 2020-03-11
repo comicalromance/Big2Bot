@@ -12,6 +12,12 @@ let SuitCode = {
     "Heart": "0x2665",
     "Spade": "0x2660"
 }
+let SetValues = {
+    "Straight": 1,
+    "Flush": 2,
+    "House": 3,
+    "Four": 4
+}
 
 function convertToString(Card) {
     let cardString = Card.number;
@@ -102,13 +108,16 @@ function generatePairs(Hand) {
     return Pairs;
 }
 
-function generateStraight(Hand) {
+function generateStraight(Hand, Limit) {
     let Stack = [], Straight = [], Histogram = generateHistogram(Hand);
-    for(let i = 3; i<16; i++) {
+    if(Limit >= 7) Limit -= 4;
+    else Limit = 3;
+    for(let i = Limit; i<16; i++) {
         if(!Histogram[i].length) {
             Stack = [];
             continue;
         }
+
         Stack.push(Histogram[i]);
         if(Stack.length == 5) {
             temp = [], temp2 = [];
@@ -126,7 +135,9 @@ function generateStraight(Hand) {
                 temp = temp2.slice(0);
                 temp2 = [];
             }
-            Straight = Straight.concat(temp);
+            for(let j of temp) {
+                Straight.push({"type": "Straight", "number": i, "set": j.slice(0)});
+            }
             Stack.shift();
         }
     }
@@ -154,19 +165,23 @@ function combinations(arr, k){
     return ret;
 }
 
-function generateFlush(Hand) {
-    let Flush = [], SuitHistogram = generateSuitHistogram(Hand);
-    for(let i = 0; i < 4; i++) {
+function generateFlush(Hand, SuitLimit) {
+    let Flush = [], SuitHistogram = generateSuitHistogram(Hand), Limit;
+    if(SuitLimit) Limit = SuitValues[SuitLimit] - 1;
+    else Limit = 0; 
+    for(let i = Limit; i < 4; i++) {
         if(SuitHistogram[Suits[i]].length < 5) continue;
         while(SuitHistogram[Suits[i]].length > 8) SuitHistogram[Suits[i]].shift();
-        Flush = Flush.concat(combinations(SuitHistogram[Suits[i]], 5)); 
+        let res = combinations(SuitHistogram[Suits[i]], 5);
+        for (let j of res) Flush.push({"type": "Flush", "suit": Suits[i], "set":j.slice(0)}); 
     }
     return Flush;
 }
 
-function generateHouse(Hand) {
+function generateHouse(Hand, Limit) {
     let House = [], Histogram = generateHistogram(Hand);
-    for(let i = 3; i<16; i++) {
+    if(!Limit) Limit = 3;
+    for(let i = Limit; i<16; i++) {
         if(Histogram[i].length >= 3) {
             for(let j = 3; j<16; j++) {
                 if(j == i) continue;
@@ -175,7 +190,7 @@ function generateHouse(Hand) {
                     for(let m = 0; m < temp.length; m++) {
                         for(let n = 0; n < temp2.length; n++) {
                             let temp3 = temp[m].concat(temp2[n]);
-                            House.push(temp3.slice(0));
+                            House.push({"type": "House", "number": i, "set": temp3.slice(0)});
                         }
                     }
                 }
@@ -185,13 +200,14 @@ function generateHouse(Hand) {
     return House;
 }
 
-function generateFour(Hand) {
+function generateFour(Hand, Limit) {
     let Four = [], Histogram = generateHistogram(Hand);
+    if(!Limit) Limit = 3;
     for(let i = 3; i<16; i++) {
         if(Histogram[i].length == 4) {
             for(let j = 12; j >= 0; j--) {
                 if(Hand[j].number != i) {
-                    Four.push(Histogram[i].concat([Hand[j]]));
+                    Four.push({"type": "Four", "number": i, "set": Histogram[i].concat([Hand[j]])});
                 }
             }
         }
@@ -199,8 +215,22 @@ function generateFour(Hand) {
     return Four;
 }
 
-function generateSets(Hand) {
-    return [generateStraight(Hand), generateFlush(Hand), generateHouse(Hand), generateFour(Hand)];
+function generateSets(Hand, Set) {
+    let Sets = [], rank;
+    if(Set) rank = SetValues[Set.type];
+    else {
+        rank = 0;
+        Set = {}
+    }
+    if(rank <= 1) Sets.push(generateStraight(Hand, Set.number));
+    else Sets.push([]);
+    if(rank <= 2) Sets.push(generateFlush(Hand, Set.suit));
+    else Sets.push([]);
+    if(rank <= 3) Sets.push(generateHouse(Hand, Set.number));
+    else Sets.push([]);
+    if(rank <= 4) Sets.push(generateFour(Hand, Set.number));
+    else Sets.push([]); 
+    return Sets;
 }
 
 

@@ -9,12 +9,12 @@ const gameSchema = new Schema({
 	user_list: [{
 		user_id: String,
 		user_name: String,
-		user_whacked: Number
+		user_hand: [{
+			number: Number,
+			suit: String
+		}]
 	}],
-	poll: { 
-		poll_id: String,
-		message_id: String,
-	}
+	current_user: String
 }, {
 	timestamps: true
 });
