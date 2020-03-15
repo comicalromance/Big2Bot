@@ -124,6 +124,7 @@ function generateSingles(Hand, Limit = 3, Suit) {
     }
     return Singles;
 }
+
 function generateStraight(Hand, Limit) {
     let Stack = [], Straight = [], Histogram = generateHistogram(Hand);
     if(Limit >= 7) Limit -= 4;
@@ -248,11 +249,33 @@ function generateSets(Hand, Set) {
     return Sets;
 }
 
+let startingKeyboard = [{text: "Play Singles", action: "single"} , {text: "Play Pairs", action: "pair"}, {text: "Play Sets", action: "set"}];
+
+function generateOptions(Hand, Set = []) {
+    let options = [];
+    if(!Set.length) {
+        options.push(startingKeyboard);
+        options.push(generateSingles(Hand));
+        options.push(generatePairs(Hand));
+        options.push(generateSets(Hand));
+    }
+    else if(Set.length == 1) {
+        options.push(generateSingles(Hand, Set[0].number, Set[0].suit));
+    }
+    else if(Set.length == 2) {
+        options.push(generatePairs(Hand, Set[0].number));
+    }
+    else if(Set.length > 2) {
+        options.push(generateSets(Hand, Set));
+    }
+    return options;
+}
+
 
 let hands = generateHands(4);
 sortHand(hands[0]);
 let pairs = generatePairs(hands[0]);
 let flush = generateFlush(hands[0]);
 
-module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets}
+module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets, generateOptions}
 
