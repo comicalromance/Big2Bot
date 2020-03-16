@@ -15,15 +15,15 @@ const gameSchema = new Schema({
 		}]
 	}],
 	current_user: Number,
-	current_hand: [{
-		type: String,
+	current_set: {
+		settype: String,
 		number: Number,
 		suit: String,
-		hand: [{
+		s3t: [{
 			number: Number,
 			suit: String
 		}]
-	}],
+	},
 	winning_user: Number
 }, {
 	timestamps: true

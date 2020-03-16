@@ -9,7 +9,18 @@ const userSchema = new Schema({
 	total_wins: {type: Number},
 	menu: [{
 		chat_id: String,
-		message_id: String
+		chat_title: String,
+		message_id: String,
+		options: [{
+			settype: String,
+			action: String,
+			number: Number,
+			suit: String,
+			s3t: [{
+				number: Number,
+				suit: String
+			}]
+		}]
 	}]
 }, {
 	timestamps: true

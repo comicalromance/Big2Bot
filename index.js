@@ -123,26 +123,75 @@ bot.command('whack', ctx => {
 		})
 })
 
-function formatKeyboard(Hand) {
-	let options = Eng.generateOptions(Hand), keyboard = [];
-	for(let menu of options) {
-		for(let items of menu) {
-			keyboard.push(Markup.callbackButton(items, `cool=${items}`))
-		}
-		break;
+function formatKeyboard(options, type) {
+	keyboard = [];
+	if(type == "start") {
+		options = Eng.generateStartingKeyboard(options);
+	}
+	for(let items of options) {
+		if(!items.action) keyboard.push(Markup.callbackButton(Eng.convertToString(items.s3t), `cool=${items._id}`))
+		else keyboard.push(Markup.callbackButton(items.text, `cool=${items.action}`))
 	}
 	return keyboard;
 }
 
-bot.command('testreply', ctx => {
-	let keyboard = [];
-	Game.findOne({chat_id: "-417588269", game_status: 2}, {user_list: { $elemMatch: {user_id: '518953753'} } })
+function generateOptions(chat_title, chat_id, user_id) {
+	let options = [], current_set;
+	return Game.findOne({chat_id: chat_id, game_status: 2})
+		.then(game => {
+			for(let user of game.user_list) {
+				if(user.user_id == user_id) {
+					if(game.current_set.length) { // confus
+						current_set = game.current_set;
+						options = Eng.generateOptions(user.user_hand, current_set);
+					}
+					else options = Eng.generateAllOptions(user.user_hand);
+					break;
+				}
+			}
+			return User.findOne({user_id: user_id}) 
+		})
 		.then(user => {
-			keyboard = formatKeyboard(user.user_list[0].user_hand);
+			if(!user.menu) user.menu = [];
+			else {
+				user.menu = user.menu.filter(menu => menu.chat_id != chat_id);
+			}
+			user.menu.push({chat_id: chat_id, chat_title: chat_title, message_id: "-1", options: options });
+			return user.save();
 		})
-		.then(() => {
+		.then(() => {return current_set})
+		.catch((err) => {return err});
+}
+
+bot.command('testreply', ctx => {
+	let keyboard = [], current_set, usr;
+	let user_id = ctx.message.from.id;
+	let chat_title = ctx.message.chat.title;
+	let chat_id = ctx.message.chat.id;
+	generateOptions(chat_title, chat_id, user_id)
+		.then(current => {
+			current_set = current;
+			return User.findOne({user_id: user_id}, {menu: { $elemMatch: {chat_id: chat_id} } })
+		})
+		.then(user => {
+			let options = user.menu[0].options; usr = user;
+			if(!current_set) {
+				keyboard = formatKeyboard(options, 'start');
+				console.log(keyboard);
+				return bot.telegram.sendMessage(user_id,`<a href="tg://user?id=${ctx.message.from.id}">${ctx.message.from.first_name}</a>`, {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
+			}
+			else {
+				keyboard = formatKeyboard(options);
+				return bot.telegram.sendMessage(user_id, `<a href="tg://user?id=${ctx.message.from.id}">${ctx.message.from.first_name}</a>`, {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
+			}
+		})
+		.then(msg => {
+			usr.menu[0].message_id = msg.message_id;
+			usr.save();
+		})
+		/*.then(() => {
 			ctx.replyWithHTML(`<a href="tg://user?id=${ctx.message.from.id}">${ctx.message.from.first_name}</a>`, Markup.inlineKeyboard(keyboard, {selective: true}).extra())
-		})
+		})*/
 })
 
 bot.on('poll', ctx =>  {
@@ -211,9 +260,10 @@ bot.command('viewstats', ctx => {
 
 bot.action(/^cool=(.+)$/, ctx => {
 	ctx.answerCbQuery('');
-	let abcd = ctx.match[1];
-	console.log(ctx.update.callback_query);
-	console.log(abcd)
+	let message_id = ctx.update.callback_query.message.message_id;
+	let user_id = ctx.update.callback_query.from.id;
+	let action = ctx.match[1];
+	//User.findOne({user_id: user_id, })
 })
 
 bot.action('whack', ctx => {

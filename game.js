@@ -1,4 +1,6 @@
 const deckSize = 52;
+let User = require('./models/user.model');
+let Game = require('./models/game.model');
 let Suits = ["Diamond", "Club", "Heart", "Spade"];
 let SuitValues = {
     "Diamond": 1,
@@ -19,14 +21,17 @@ let SetValues = {
     "Four": 4
 }
 
-function convertToString(Card) {
-    let cardString = Card.number;
-    if(Card.number == 11) cardString = "J";
-    else if(Card.number == 12) cardString = "Q";
-    else if(Card.number == 13) cardString = "K";
-    else if(Card.number == 14) cardString = "A";
-    else if(Card.number == 15) cardString = 2;
-    cardString += String.fromCodePoint(SuitCode[Card.suit]);
+function convertToString(Set) {
+    let cardString = "";
+    for(Card in Set) {
+        if(cardString) cardString += " ";
+        cardString += String.fromCodePoint(SuitCode[Card.suit]);
+        if(Card.number == 11) cardString += "J";
+        else if(Card.number == 12) cardString += "Q";
+        else if(Card.number == 13) cardString += "K";
+        else if(Card.number == 14) cardString += "A";
+        else if(Card.number == 15) cardString += 2;
+    }
     return cardString;
 }
 
@@ -95,20 +100,20 @@ function generatePairs(Hand, Limit = 3) {
     let Pairs = [], Histogram = generateHistogram(Hand);
     for(let i = Limit; i<16; i++) {
         if(Histogram[i].length == 2) {
-            Pairs.push([Histogram[i][0], Histogram[i][1]]);
+            Pairs.push({settype: "pair", s3t: [Histogram[i][0], Histogram[i][1]]});
         }
         else if(Histogram[i].length == 3) {
-            Pairs.push([Histogram[i][0], Histogram[i][1]]);
-            Pairs.push([Histogram[i][0], Histogram[i][2]]);
-            Pairs.push([Histogram[i][1], Histogram[i][2]]);
+            Pairs.push({settype: "pair", s3t: [Histogram[i][0], Histogram[i][1]]});
+            Pairs.push({settype: "pair", s3t: [Histogram[i][0], Histogram[i][2]]});
+            Pairs.push({settype: "pair", s3t: [Histogram[i][1], Histogram[i][2]]});
         }
         else if(Histogram[i].length == 4) {
-            Pairs.push([Histogram[i][0], Histogram[i][1]]);
-            Pairs.push([Histogram[i][0], Histogram[i][2]]);
-            Pairs.push([Histogram[i][0], Histogram[i][3]]);
-            Pairs.push([Histogram[i][1], Histogram[i][2]]);
-            Pairs.push([Histogram[i][1], Histogram[i][3]]);
-            Pairs.push([Histogram[i][2], Histogram[i][3]]);
+            Pairs.push({settype: "pair", s3t: [Histogram[i][0], Histogram[i][1]]});
+            Pairs.push({settype: "pair", s3t: [Histogram[i][0], Histogram[i][2]]});
+            Pairs.push({settype: "pair", s3t: [Histogram[i][0], Histogram[i][3]]});
+            Pairs.push({settype: "pair", s3t: [Histogram[i][1], Histogram[i][2]]});
+            Pairs.push({settype: "pair", s3t: [Histogram[i][1], Histogram[i][3]]});
+            Pairs.push({settype: "pair", s3t: [Histogram[i][2], Histogram[i][3]]});
         }
     }
     return Pairs;
@@ -119,8 +124,8 @@ function generateSingles(Hand, Limit = 3, Suit) {
     if(!Suit) SuitVal = 0;
     else SuitVal = SuitValues[Suit];
     for(let i=Hand.length-1; i >= 0; i--) {
-        if(Hand[i].number > Limit ) Singles.push({type: "single", card: Hand[i]});
-        else if(Hand[i].number == Limit && SuitValues[Hand[i].suit] > SuitVal) Singles.push({type: "single", card: Hand[i]});
+        if(Hand[i].number > Limit ) Singles.push({settype: "single", s3t: [Hand[i]]});
+        else if(Hand[i].number == Limit && SuitValues[Hand[i].suit] > SuitVal) Singles.push({settype: "single", s3t: [Hand[i]]});
     }
     return Singles;
 }
@@ -153,7 +158,7 @@ function generateStraight(Hand, Limit) {
                 temp2 = [];
             }
             for(let j of temp) {
-                Straight.push({"type": "straight", "number": i, "set": j.slice(0)});
+                Straight.push({"settype": "straight", "number": i, "s3t": j.slice(0)});
             }
             Stack.shift();
         }
@@ -190,7 +195,7 @@ function generateFlush(Hand, SuitLimit) {
         if(SuitHistogram[Suits[i]].length < 5) continue;
         while(SuitHistogram[Suits[i]].length > 8) SuitHistogram[Suits[i]].shift();
         let res = combinations(SuitHistogram[Suits[i]], 5);
-        for (let j of res) Flush.push({"type": "flush", "suit": Suits[i], "set":j.slice(0)}); 
+        for (let j of res) Flush.push({"settype": "flush", "suit": Suits[i], "s3t":j.slice(0)}); 
     }
     return Flush;
 }
@@ -206,7 +211,7 @@ function generateHouse(Hand, Limit=3) {
                     for(let m = 0; m < temp.length; m++) {
                         for(let n = 0; n < temp2.length; n++) {
                             let temp3 = temp[m].concat(temp2[n]);
-                            House.push({"type": "house", "number": i, "set": temp3.slice(0)});
+                            House.push({"settype": "house", "number": i, "s3t": temp3.slice(0)});
                         }
                     }
                 }
@@ -223,7 +228,7 @@ function generateFour(Hand, Limit) {
         if(Histogram[i].length == 4) {
             for(let j = 12; j >= 0; j--) {
                 if(Hand[j].number != i) {
-                    Four.push({"type": "four", "number": i, "set": Histogram[i].concat([Hand[j]])});
+                    Four.push({"settype": "four", "number": i, "s3t": Histogram[i].concat([Hand[j]])});
                 }
             }
         }
@@ -233,34 +238,40 @@ function generateFour(Hand, Limit) {
 
 function generateSets(Hand, Set) {
     let Sets = [], rank;
-    if(Set) rank = SetValues[Set.type];
+    if(Set) rank = SetValues[Set.settype];
     else {
         rank = 0;
         Set = {}
     }
-    if(rank <= 1) Sets.push(generateStraight(Hand, Set.number));
-    else Sets.push([]);
-    if(rank <= 2) Sets.push(generateFlush(Hand, Set.suit));
-    else Sets.push([]);
-    if(rank <= 3) Sets.push(generateHouse(Hand, Set.number));
-    else Sets.push([]);
-    if(rank <= 4) Sets.push(generateFour(Hand, Set.number));
-    else Sets.push([]); 
+    if(rank <= 1) Sets = Sets.concat(generateStraight(Hand, Set.number));
+    if(rank <= 2) Sets = Sets.concat(generateFlush(Hand, Set.suit));
+    if(rank <= 3) Sets = Sets.concat(generateHouse(Hand, Set.number));
+    if(rank <= 4) Sets = Sets.concat(generateFour(Hand, Set.number)); 
     return Sets;
 }
 
-function convertToAction(Set) {
-    let action = "";
-    if(Set.type == "single") {
-        action = `single ${Set.card.number} ${Set.card.suit}`;
-    }
-    return action;
+function generateAllOptions(Hand) {
+    let options = [];
+    options = options.concat(generateSingles(Hand));
+    options = options.concat(generatePairs(Hand));
+    options = options.concat(generateSets(Hand));
+    return options;
 }
 
-function generateStartingKeyboard(Hand) {
-    let optionsKeyboard = [{text: "Play Singles", action: "single"}];
-    if(generatePairs(Hand).length) optionsKeyboard.push({text: "Play Pairs", action: "pair"});
-    if(generateSets(Hand).length) optionsKeyboard.push({text: "Play Sets", action: "set"});
+function generateStartingKeyboard(options) {
+    let optionsKeyboard = [{text: "Play Singles", action: "single"}], index;
+    for(index = 0; index < options.length; index++) {
+        if(options[index].settype == "pair") {
+            optionsKeyboard.push({text: "Play Pairs", action: "pair"});
+            break;
+        }
+    }
+    for(index; index < options.length; index++) {
+        if(options[index].settype != "pair" && options[index].settype != "single") {
+            optionsKeyboard.push({text: "Play Sets", action: "set"});
+            break;
+        } 
+    }
     return optionsKeyboard;
 }
 
@@ -310,5 +321,5 @@ sortHand(hands[0]);
 let pairs = generatePairs(hands[0]);
 let flush = generateFlush(hands[0]);
 
-module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets, generateOptions, generateStartingOptions}
+module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets, generateOptions, generateStartingOptions, generateAllOptions, generateStartingKeyboard}
 
