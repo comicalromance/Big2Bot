@@ -119,8 +119,8 @@ function generateSingles(Hand, Limit = 3, Suit) {
     if(!Suit) SuitVal = 0;
     else SuitVal = SuitValues[Suit];
     for(let i=Hand.length-1; i >= 0; i--) {
-        if(Hand[i].number > Limit ) Singles.push(Hand[i]);
-        else if(Hand[i].number == Limit && SuitValues[Hand[i].suit] > SuitVal) Singles.push(Hand[i]);
+        if(Hand[i].number > Limit ) Singles.push({type: "single", card: Hand[i]});
+        else if(Hand[i].number == Limit && SuitValues[Hand[i].suit] > SuitVal) Singles.push({type: "single", card: Hand[i]});
     }
     return Singles;
 }
@@ -153,7 +153,7 @@ function generateStraight(Hand, Limit) {
                 temp2 = [];
             }
             for(let j of temp) {
-                Straight.push({"type": "Straight", "number": i, "set": j.slice(0)});
+                Straight.push({"type": "straight", "number": i, "set": j.slice(0)});
             }
             Stack.shift();
         }
@@ -190,7 +190,7 @@ function generateFlush(Hand, SuitLimit) {
         if(SuitHistogram[Suits[i]].length < 5) continue;
         while(SuitHistogram[Suits[i]].length > 8) SuitHistogram[Suits[i]].shift();
         let res = combinations(SuitHistogram[Suits[i]], 5);
-        for (let j of res) Flush.push({"type": "Flush", "suit": Suits[i], "set":j.slice(0)}); 
+        for (let j of res) Flush.push({"type": "flush", "suit": Suits[i], "set":j.slice(0)}); 
     }
     return Flush;
 }
@@ -206,7 +206,7 @@ function generateHouse(Hand, Limit=3) {
                     for(let m = 0; m < temp.length; m++) {
                         for(let n = 0; n < temp2.length; n++) {
                             let temp3 = temp[m].concat(temp2[n]);
-                            House.push({"type": "House", "number": i, "set": temp3.slice(0)});
+                            House.push({"type": "house", "number": i, "set": temp3.slice(0)});
                         }
                     }
                 }
@@ -223,7 +223,7 @@ function generateFour(Hand, Limit) {
         if(Histogram[i].length == 4) {
             for(let j = 12; j >= 0; j--) {
                 if(Hand[j].number != i) {
-                    Four.push({"type": "Four", "number": i, "set": Histogram[i].concat([Hand[j]])});
+                    Four.push({"type": "four", "number": i, "set": Histogram[i].concat([Hand[j]])});
                 }
             }
         }
@@ -249,17 +249,50 @@ function generateSets(Hand, Set) {
     return Sets;
 }
 
-let startingKeyboard = [{text: "Play Singles", action: "single"} , {text: "Play Pairs", action: "pair"}, {text: "Play Sets", action: "set"}];
+function convertToAction(Set) {
+    let action = "";
+    if(Set.type == "single") {
+        action = `single ${Set.card.number} ${Set.card.suit}`;
+    }
+    return action;
+}
+
+function generateStartingKeyboard(Hand) {
+    let optionsKeyboard = [{text: "Play Singles", action: "single"}];
+    if(generatePairs(Hand).length) optionsKeyboard.push({text: "Play Pairs", action: "pair"});
+    if(generateSets(Hand).length) optionsKeyboard.push({text: "Play Sets", action: "set"});
+    return optionsKeyboard;
+}
+
+function generateSingleOptions(Hand) {
+    let singles = generateSingles(Hand);
+    let optionsKeyboard = [];
+    for(let card in singles) {
+        optionsKeyboard.push({text: convertToString(card), action: convertToAction(card)});
+    }
+    return optionsKeyboard;
+}
+
+function generateStartingOptions(Hand, action) {
+    let options = [];
+    if(action == "start") {
+        options.push(generateStartingKeyboard(Hand));
+    }
+    else if(action == "single") {
+        options.push(generateSingleOptions(Hand));
+    }
+    else if(Set.length == 2) {
+        options.push(generatePairs(Hand, Set[0].number));
+    }
+    else if(Set.length > 2) {
+        options.push(generateSets(Hand, Set));
+    }
+    return options;
+}
 
 function generateOptions(Hand, Set = []) {
     let options = [];
-    if(!Set.length) {
-        options.push(startingKeyboard);
-        options.push(generateSingles(Hand));
-        options.push(generatePairs(Hand));
-        options.push(generateSets(Hand));
-    }
-    else if(Set.length == 1) {
+    if(Set.length == 1) {
         options.push(generateSingles(Hand, Set[0].number, Set[0].suit));
     }
     else if(Set.length == 2) {
@@ -277,5 +310,5 @@ sortHand(hands[0]);
 let pairs = generatePairs(hands[0]);
 let flush = generateFlush(hands[0]);
 
-module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets, generateOptions}
+module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets, generateOptions, generateStartingOptions}
 
