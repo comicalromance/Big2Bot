@@ -124,19 +124,29 @@ bot.command('whack', ctx => {
 })
 
 function formatKeyboard(options, type) {
-	keyboard = [];
-	if(type == "start") {
-		options = Eng.generateStartingKeyboard(options);
-	}
-	for(let items of options) {
-		if(!items.action) keyboard.push(Markup.callbackButton(Eng.convertToString(items.s3t), `cool=${items._id}`))
+	let keyboard = [];
+	let results = Eng.formatKeyboard(options, type);
+	for(let items of results) {
+		if(!items.action) keyboard.push(Markup.callbackButton(Eng.convertToString(items.s3t), `cool=play ${items._id}`))
 		else keyboard.push(Markup.callbackButton(items.text, `cool=${items.action}`))
 	}
 	return keyboard;
 }
 
-function generateOptions(chat_title, chat_id, user_id) {
-	let options = [], current_set;
+function updateOptions(chat_title, chat_id, user_id, options) {
+	return User.findOne({user_id: user_id}) 
+		.then(user => {
+			if(!user.menu) user.menu = [];
+			else {
+				user.menu = user.menu.filter(menu => menu.chat_id != chat_id);
+			}
+			user.menu.push({chat_id: chat_id, chat_title: chat_title, message_id: "-1", options: options });
+			return user.save();
+		})
+		.catch((err) => {return err});
+}
+
+function generateOptions(chat_id, user_id) {
 	return Game.findOne({chat_id: chat_id, game_status: 2})
 		.then(game => {
 			for(let user of game.user_list) {
@@ -149,18 +159,34 @@ function generateOptions(chat_title, chat_id, user_id) {
 					break;
 				}
 			}
-			return User.findOne({user_id: user_id}) 
+			return {options: options, current_set: current_set};
 		})
-		.then(user => {
-			if(!user.menu) user.menu = [];
-			else {
-				user.menu = user.menu.filter(menu => menu.chat_id != chat_id);
+		.catch(err => console.log(err));
+}
+
+function playOption(chat_id, chat_title, user_id, options) {
+	let next_user, next_options;
+	Game.findOne({chat_id: chat_id, game_status: 2})
+		.then(game => {
+			game.current_set = options;
+			game.current_user++;
+			for(let user of game.user_list) {
+				if(user.user_id == user_id) {
+					user.user_hand = Eng.removeCards(user.user_hand, options);
+				}
 			}
-			user.menu.push({chat_id: chat_id, chat_title: chat_title, message_id: "-1", options: options });
-			return user.save();
+			let next_index = game.current_user % 4;
+			next_user = game.user_list[next_index].user_id;
+			next_options = Eng.generateOptions(game.user_list[next_index].user_hand);
+			return game.save();
 		})
-		.then(() => {return current_set})
-		.catch((err) => {return err});
+		.then(() => {
+			return updateOptions(chat_title, chat_id, next_user, next_options);
+		})
+		.then(() => {
+			return updateTurn(chat_title, chat_id, next_user)
+		})
+		.catch(err => console.log(err));
 }
 
 bot.command('testreply', ctx => {
@@ -168,11 +194,12 @@ bot.command('testreply', ctx => {
 	let user_id = ctx.message.from.id;
 	let chat_title = ctx.message.chat.title;
 	let chat_id = ctx.message.chat.id;
-	generateOptions(chat_title, chat_id, user_id)
-		.then(current => {
-			current_set = current;
-			return User.findOne({user_id: user_id}, {menu: { $elemMatch: {chat_id: chat_id} } })
+	generateOptions(chat_id, user_id)
+		.then(res => {
+			current_set = res.current_set;
+			return updateOptions(chat_title, chat_id, user_id, res.options);
 		})
+		.then(() => {return User.findOne({user_id: user_id}, {menu: { $elemMatch: {chat_id: chat_id} } }) })
 		.then(user => {
 			let options = user.menu[0].options; usr = user;
 			if(!current_set) {
@@ -181,7 +208,7 @@ bot.command('testreply', ctx => {
 				return bot.telegram.sendMessage(user_id,`<a href="tg://user?id=${ctx.message.from.id}">${ctx.message.from.first_name}</a>`, {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
 			}
 			else {
-				keyboard = formatKeyboard(options);
+				keyboard = formatKeyboard(options); 
 				return bot.telegram.sendMessage(user_id, `<a href="tg://user?id=${ctx.message.from.id}">${ctx.message.from.first_name}</a>`, {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
 			}
 		})
@@ -258,12 +285,22 @@ bot.command('viewstats', ctx => {
 		.catch(err => console.log(err));
 })
 
-bot.action(/^cool=(.+)$/, ctx => {
+bot.action(/^cool=( .+)$/, ctx => {
 	ctx.answerCbQuery('');
 	let message_id = ctx.update.callback_query.message.message_id;
 	let user_id = ctx.update.callback_query.from.id;
 	let action = ctx.match[1];
-	//User.findOne({user_id: user_id, })
+	User.findOne({user_id: user_id}, {menu: { $elemMatch: {message_id: message_id} } })
+		.then(user => {
+			if(!user) throw("Message not found: Outdated Query?");
+			if(action.split(" ")[0] == "play") {
+				let index = action.split(" ")[1];
+				let option = user.menu[0].options[index];
+				return playOption(user.menu[0].chat_id, user.menu[0].chat_title, user_id, option);
+			}
+			else generateOptions(user.menu[0].options, action);
+		})
+		.catch(err => console.log(err))
 })
 
 bot.action('whack', ctx => {

@@ -275,32 +275,51 @@ function generateStartingKeyboard(options) {
     return optionsKeyboard;
 }
 
-function generateSingleOptions(Hand) {
-    let singles = generateSingles(Hand);
-    let optionsKeyboard = [];
-    for(let card in singles) {
-        optionsKeyboard.push({text: convertToString(card), action: convertToAction(card)});
+function generateSetsKeyboard(options) {
+    let optionsKeyboard = [], index;
+    for(index = 0; index < options.length; index++) {
+        if(options[index].settype == "straight") {
+            optionsKeyboard.push({text: "Play Straight", action: "straight"});
+            break;
+        }
+    }
+    for(index; index < options.length; index++) {
+        if(options[index].settype == "flush") {
+            optionsKeyboard.push({text: "Play Flush", action: "flush"});
+            break;
+        } 
+    }
+    for(index; index < options.length; index++) {
+        if(options[index].settype == "house") {
+            optionsKeyboard.push({text: "Play House", action: "house"});
+            break;
+        } 
+    }
+    for(index; index < options.length; index++) {
+        if(options[index].settype == "four") {
+            optionsKeyboard.push({text: "Play Four-of-a-Kind", action: "four"});
+            break;
+        } 
     }
     return optionsKeyboard;
 }
 
-function generateStartingOptions(Hand, action) {
-    let options = [];
-    if(action == "start") {
-        options.push(generateStartingKeyboard(Hand));
+function generateKeyboard(options, type) {
+    let results = [];
+    if(type == "start") {
+		results = generateStartingKeyboard(options);
+	}
+	else if(type == "single") {
+		results = options.filter(option => option.settype == "single");
+	}
+	else if(type == "pair") {
+		results = options.filter(option => option.settype == "pair");
+	}
+	else if(type == "set") {
+		results = generateSetsKeyboard(options);
     }
-    else if(action == "single") {
-        options.push(generateSingleOptions(Hand));
-    }
-    else if(Set.length == 2) {
-        options.push(generatePairs(Hand, Set[0].number));
-    }
-    else if(Set.length > 2) {
-        options.push(generateSets(Hand, Set));
-    }
-    return options;
+    return results;
 }
-
 function generateOptions(Hand, Set = []) {
     let options = [];
     if(Set.length == 1) {
@@ -321,5 +340,5 @@ sortHand(hands[0]);
 let pairs = generatePairs(hands[0]);
 let flush = generateFlush(hands[0]);
 
-module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets, generateOptions, generateStartingOptions, generateAllOptions, generateStartingKeyboard}
+module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets, generateKeyboard, generateOptions, generateAllOptions, generateStartingKeyboard}
 
