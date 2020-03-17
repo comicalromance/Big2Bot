@@ -123,19 +123,34 @@ bot.command('whack', ctx => {
 		})
 })
 
-function formatKeyboard(options, type) {
-	let keyboard = [];
-	let results = Eng.formatKeyboard(options, type);
+function compactKeyboard(options, set = false) {
+	return_keyboard = [], keyboard = options.slice(0), temp = [];
+	console.log(options);
+	while(keyboard[keyboard.length-1].text == 'Pass' || keyboard[keyboard.length-1].text == '<<') temp.push(keyboard.pop());
+    while(keyboard.length) {
+        if(set) return_keyboard.push(keyboard.splice(0, 2));
+        else return_keyboard.push(keyboard.splice(0, 4));
+	}
+	return_keyboard.push(temp);
+    return return_keyboard;
+}
+
+function formatKeyboard(options, type='no') {
+	let keyboard = [], return_keyboard = [], set = false;
+	let results = Eng.generateKeyboard(options, type);
 	for(let items of results) {
+		if(items.settype != 'single' && items.settype != 'pair') set = true;
 		if(!items.action) keyboard.push(Markup.callbackButton(Eng.convertToString(items.s3t), `cool=play ${items._id}`))
 		else keyboard.push(Markup.callbackButton(items.text, `cool=${items.action}`))
 	}
-	return keyboard;
+	return_keyboard = compactKeyboard(keyboard, set);
+	return return_keyboard;
 }
 
 function updateOptions(chat_title, chat_id, user_id, options) {
 	return User.findOne({user_id: user_id}) 
 		.then(user => {
+			if(!user) throw "No user found to update cards!";
 			if(!user.menu) user.menu = [];
 			else {
 				user.menu = user.menu.filter(menu => menu.chat_id != chat_id);
@@ -146,45 +161,84 @@ function updateOptions(chat_title, chat_id, user_id, options) {
 		.catch((err) => {return err});
 }
 
-function generateOptions(chat_id, user_id) {
-	return Game.findOne({chat_id: chat_id, game_status: 2})
-		.then(game => {
-			for(let user of game.user_list) {
-				if(user.user_id == user_id) {
-					if(game.current_set.length) { // confus
-						current_set = game.current_set;
-						options = Eng.generateOptions(user.user_hand, current_set);
+function generateOptions(chat_id, user_id, hand = [], current_set = []) {
+	if(hand.length) {
+		if(current_set.length) options = Eng.generateOptions(hand, current_set);
+		else options = Eng.generateAllOptions(hand);
+		return options;
+	}
+	else {
+		return Game.findOne({chat_id: chat_id, game_status: 2})
+			.then(game => {
+				for(let user of game.user_list) {
+					if(user.user_id == user_id) {
+						return Eng.generateAllOptions(user.user_hand);
 					}
-					else options = Eng.generateAllOptions(user.user_hand);
-					break;
 				}
-			}
-			return {options: options, current_set: current_set};
-		})
-		.catch(err => console.log(err));
+			})
+			.catch(err => console.log(err));
+	}
 }
 
-function playOption(chat_id, chat_title, user_id, options) {
-	let next_user, next_options;
+function startTurn(chat_title, chat_id, user_id, user_name, hand = [], set = []) {
+	generateOptions(chat_id, user_id, hand, set)
+		.then(options => {
+			return updateOptions(chat_title, chat_id, user_id, options);
+		})
+		.then(() => { return User.findOne({user_id: user_id}, {menu: { $elemMatch: {chat_id: chat_id} } }) })
+		.then(user => {
+			let options = user.menu[0].options; usr = user;
+			if(!set.length) {
+				keyboard = formatKeyboard(options, 'start');
+				return bot.telegram.sendMessage(user_id,`<a href="tg://user?id=${user_id}">${user_name}</a>`, {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
+			}
+			else {
+				keyboard = formatKeyboard(options); 
+				return bot.telegram.sendMessage(user_id, `<a href="tg://user?id=${user_id}">${user_name}</a>`, {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
+			}
+		})
+		.then(msg => {
+			usr.menu[0].message_id = msg.message_id;
+			usr.save();
+		})
+}
+
+function playOption(chat_id, chat_title, user_id, user_name, options, pass = false) {
 	Game.findOne({chat_id: chat_id, game_status: 2})
 		.then(game => {
-			game.current_set = options;
-			game.current_user++;
-			for(let user of game.user_list) {
-				if(user.user_id == user_id) {
-					user.user_hand = Eng.removeCards(user.user_hand, options);
+			if(!pass) {
+				game.current_set = options;
+				game.winning_user = game.current_user;
+				game.times_passed = 0;
+				for(let user of game.user_list) {
+					if(user.user_id == user_id) {
+						user.user_hand = Eng.removeCards(user.user_hand, options.s3t);
+					}
 				}
 			}
-			let next_index = game.current_user % 4;
-			next_user = game.user_list[next_index].user_id;
-			next_options = Eng.generateOptions(game.user_list[next_index].user_hand);
+			else game.times_passed++;
+
+			game.current_user = (game.current_user + 1) % 4;
+			
+			let next_index = game.current_user;
+			let next_user = game.user_list[next_index].user_id;
+			let next_username = game.user_list[next_index].user_name;
+
+			if(game.times_passed == 3) {
+				game.current_set = [];
+				next_index = game.winning_user;
+				next_user = game.user_list[next_index].user_id;
+				next_username = game.user_list[next_index].user_name;
+				game.times_passed = 0;
+				bot.telegram.sendMessage(chat_id,`Everyone has passed. <a href="tg://user?id=${next_user}">${next_username}</a> has played `, {parse_mode: 'HTML'});
+			}
+
+			else {
+				bot.telegram.sendMessage(chat_id,`<a href="tg://user?id=${user_id}">${user_name}</a> has played ${Eng.convertToString(options.s3t)}`, {parse_mode: 'HTML'});
+			}
+
+			startTurn(chat_title, chat_id, next_user, game.user_list[next_index].user_hand, game.current_set)
 			return game.save();
-		})
-		.then(() => {
-			return updateOptions(chat_title, chat_id, next_user, next_options);
-		})
-		.then(() => {
-			return updateTurn(chat_title, chat_id, next_user)
 		})
 		.catch(err => console.log(err));
 }
@@ -194,31 +248,8 @@ bot.command('testreply', ctx => {
 	let user_id = ctx.message.from.id;
 	let chat_title = ctx.message.chat.title;
 	let chat_id = ctx.message.chat.id;
-	generateOptions(chat_id, user_id)
-		.then(res => {
-			current_set = res.current_set;
-			return updateOptions(chat_title, chat_id, user_id, res.options);
-		})
-		.then(() => {return User.findOne({user_id: user_id}, {menu: { $elemMatch: {chat_id: chat_id} } }) })
-		.then(user => {
-			let options = user.menu[0].options; usr = user;
-			if(!current_set) {
-				keyboard = formatKeyboard(options, 'start');
-				console.log(keyboard);
-				return bot.telegram.sendMessage(user_id,`<a href="tg://user?id=${ctx.message.from.id}">${ctx.message.from.first_name}</a>`, {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
-			}
-			else {
-				keyboard = formatKeyboard(options); 
-				return bot.telegram.sendMessage(user_id, `<a href="tg://user?id=${ctx.message.from.id}">${ctx.message.from.first_name}</a>`, {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
-			}
-		})
-		.then(msg => {
-			usr.menu[0].message_id = msg.message_id;
-			usr.save();
-		})
-		/*.then(() => {
-			ctx.replyWithHTML(`<a href="tg://user?id=${ctx.message.from.id}">${ctx.message.from.first_name}</a>`, Markup.inlineKeyboard(keyboard, {selective: true}).extra())
-		})*/
+	let user_name = ctx.message.from.first_name + " " + ctx.message.from.last_name;
+	startTurn(chat_title, chat_id, user_id, user_name);
 })
 
 bot.on('poll', ctx =>  {
@@ -285,20 +316,29 @@ bot.command('viewstats', ctx => {
 		.catch(err => console.log(err));
 })
 
-bot.action(/^cool=( .+)$/, ctx => {
+bot.action(/^cool=(.+)$/, ctx => {
 	ctx.answerCbQuery('');
 	let message_id = ctx.update.callback_query.message.message_id;
 	let user_id = ctx.update.callback_query.from.id;
+	let user_name = ctx.update.callback_query.from.first_name + " " + ctx.update.callback_query.from.last_name;
 	let action = ctx.match[1];
 	User.findOne({user_id: user_id}, {menu: { $elemMatch: {message_id: message_id} } })
 		.then(user => {
 			if(!user) throw("Message not found: Outdated Query?");
 			if(action.split(" ")[0] == "play") {
 				let index = action.split(" ")[1];
-				let option = user.menu[0].options[index];
-				return playOption(user.menu[0].chat_id, user.menu[0].chat_title, user_id, option);
+				for(let option of user.menu[0].options) {
+					if(index == option._id) return playOption(user.menu[0].chat_id, user.menu[0].chat_title, user_id, user_name, option);
+				}
+				throw("Couldn't find option");
 			}
-			else generateOptions(user.menu[0].options, action);
+			else if(action == "pass") {
+				return playOption(user.menu[0].chat_id, user.menu[0].chat_title, user_id, user_name, "", true);
+			}
+			else {
+				let keyboard = formatKeyboard(user.menu[0].options, action)
+				return ctx.editMessageReplyMarkup({inline_keyboard: keyboard } )
+			}
 		})
 		.catch(err => console.log(err))
 })

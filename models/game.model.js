@@ -24,6 +24,7 @@ const gameSchema = new Schema({
 			suit: String
 		}]
 	},
+	times_passed: Number,
 	winning_user: Number
 }, {
 	timestamps: true

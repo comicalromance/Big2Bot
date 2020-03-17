@@ -6,8 +6,8 @@ let User = require('./models/user.model');
 let Game = require('./models/game.model');
 let bot = require('./bot');
 
-function startGame(chat_id) {
-	let currentPlayer, hands = Eng.generateHands(4);
+function startGame(ctx) {
+	let currentPlayer, hands = Eng.generateHands(4), chat_id = ctx.message.chat_id;
 	Game.findOne({chat_id: chat_id, game_status: 2})
 		.then(game => {
 			if(!game) {
@@ -137,7 +137,7 @@ function hearStart(ctx) {
 			bot.telegram.sendMessage(chat_id, `<a href="tg://user?id=${user_id}">${user_name}</a> has joined the game!`, {parse_mode: 'HTML'});
 			listPlayers(chat_id);
 		})
-		.then(() => {if(game_start) Start.startGame(chat_id);})
+		.then(() => {if(game_start) Start.startGame(ctx);})
 		.catch(err => console.log(err));
 }
 

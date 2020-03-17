@@ -23,10 +23,11 @@ let SetValues = {
 
 function convertToString(Set) {
     let cardString = "";
-    for(Card in Set) {
+    for(let Card of Set) {
         if(cardString) cardString += " ";
         cardString += String.fromCodePoint(SuitCode[Card.suit]);
-        if(Card.number == 11) cardString += "J";
+        if(Card.number < 11) cardString += Card.number;
+        else if(Card.number == 11) cardString += "J";
         else if(Card.number == 12) cardString += "Q";
         else if(Card.number == 13) cardString += "K";
         else if(Card.number == 14) cardString += "A";
@@ -41,12 +42,28 @@ function find3Dim(Hand) {
     }
     return false;
 }
+
 function shuffleArray(array) {
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
     }
     return array;
+}
+
+function removeCards(Hand, options) {
+    let newHand = [];
+    for(let Card of Hand) {
+        let remove = false;
+        for(let rCard of options) {
+            if(Card.number == rCard.number && Card.suit == rCard.suit) {
+                remove = true;
+                break;
+            }
+        }
+        if(!remove) newHand.push(Card);
+    }
+    return newHand;
 }
 
 function generateDeck() {
@@ -283,19 +300,19 @@ function generateSetsKeyboard(options) {
             break;
         }
     }
-    for(index; index < options.length; index++) {
+    for(index = 0; index < options.length; index++) {
         if(options[index].settype == "flush") {
             optionsKeyboard.push({text: "Play Flush", action: "flush"});
             break;
         } 
     }
-    for(index; index < options.length; index++) {
+    for(index = 0; index < options.length; index++) {
         if(options[index].settype == "house") {
             optionsKeyboard.push({text: "Play House", action: "house"});
             break;
         } 
     }
-    for(index; index < options.length; index++) {
+    for(index = 0; index < options.length; index++) {
         if(options[index].settype == "four") {
             optionsKeyboard.push({text: "Play Four-of-a-Kind", action: "four"});
             break;
@@ -305,40 +322,53 @@ function generateSetsKeyboard(options) {
 }
 
 function generateKeyboard(options, type) {
-    let results = [];
-    if(type == "start") {
+    let results = [], keyboard = [];
+    if(type == "no") {
+        if(options[0].settype == "single" || options[0].settype == "pair") {
+            results = options;
+        }
+        else {
+            results = generateSetsKeyboard(options);
+        }
+    }
+    else if(type == "start") {
 		results = generateStartingKeyboard(options);
 	}
 	else if(type == "single") {
-		results = options.filter(option => option.settype == "single");
+        results = options.filter(option => option.settype == "single");
+        results.push({text: "<<", action: "start"})
 	}
 	else if(type == "pair") {
-		results = options.filter(option => option.settype == "pair");
+        results = options.filter(option => option.settype == "pair");
+        results.push({text: "<<", action: "start"})
 	}
 	else if(type == "set") {
-		results = generateSetsKeyboard(options);
+        results = generateSetsKeyboard(options);
+        if(results.length != options.length) results.push({text: "<<", action: "start"})
+        else results.push({text: "Pass", action: "pass"});
+    }
+    else {
+        results = options.filter(option => option.settype == type);
+        results.push({text: "<<", action: "set"});
+        if(results.length == options.length) results.push({text: "Pass", action: "pass"});
     }
     return results;
 }
-function generateOptions(Hand, Set = []) {
+
+function generateOptions(Hand, Set) {
     let options = [];
-    if(Set.length == 1) {
-        options.push(generateSingles(Hand, Set[0].number, Set[0].suit));
+    if(Set.s3t.length == 1) {
+        options = generateSingles(Hand, Set.number, Set.suit);
     }
-    else if(Set.length == 2) {
-        options.push(generatePairs(Hand, Set[0].number));
+    else if(Set.s3t.length == 2) {
+        options = generatePairs(Hand, Set.number);
     }
-    else if(Set.length > 2) {
-        options.push(generateSets(Hand, Set));
+    else if(Set.s3t.length > 2) {
+        options = generateSets(Hand, Set);
     }
     return options;
 }
 
 
-let hands = generateHands(4);
-sortHand(hands[0]);
-let pairs = generatePairs(hands[0]);
-let flush = generateFlush(hands[0]);
-
-module.exports = {find3Dim, convertToString, generateHands, sortHand, generatePairs, generateSingles, generateSets, generateKeyboard, generateOptions, generateAllOptions, generateStartingKeyboard}
+module.exports = {find3Dim, convertToString, removeCards, generateHands, sortHand, generateKeyboard, generateOptions, generateAllOptions, generateStartingKeyboard}
 
