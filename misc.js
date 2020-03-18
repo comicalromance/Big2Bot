@@ -1,10 +1,11 @@
 let User = require('./models/user.model');
 let Game = require('./models/game.model');
+let Eng = require('./game');
 let bot = require('./bot');
 
 function listPlayers(chat_id) {
 	let msg = "Current Players:<pre>\n</pre>";
-	Game.findOne({chat_id: chat_id, game_status: {$ne: 4}})
+	Game.findOne({chat_id: chat_id, game_status: {$ne: 3}})
 		.then(game => {
 			if(game == null) {
 				bot.telegram.sendMessage(chat_id, "No game detected");
@@ -19,6 +20,14 @@ function listPlayers(chat_id) {
 		.catch(err => msg = err)
 }
 
+function viewHand(chat_id, user_id) {
+	Game.findOne({chat_id: chat_id}, {user_list: { $elemMatch: {user_id: user_id} } })
+		.then(game => {
+			let text = Eng.convertHandToString(game.user_list[0].user_hand);
+			bot.telegram.sendMessage(user_id, text, {parse_mode: 'HTML'});
+		})
+		.catch(err => console.log(err))
+}
 function getPlayerList(chat_id) {
 	let arr = [];
 	return Game.findOne({chat_id: chat_id, game_status: {$ne: 4}})
@@ -64,4 +73,4 @@ function findMostVoted(options) {
 	return maxUser;
 }
 
-module.exports = {listPlayers, getPlayerList, checkUserinList, findMostVoted}
+module.exports = {listPlayers, getPlayerList, checkUserinList, viewHand, findMostVoted}

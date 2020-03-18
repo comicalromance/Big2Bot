@@ -46,6 +46,12 @@ bot.hears(/^\/start[ =](.+)$/, ctx => Start.hearStart(ctx));
 
 bot.command('start', ctx => Start.handleStart(ctx));
 
+/*bot.command('viewhand', ctx => {
+	let chat_id = ctx.message.chat.id;
+	let user_id = ctx.message.user.id;
+	Misc.viewHand(chat_id, user_id);
+})*/
+
 bot.command('stop', ctx => {
 	if(ctx.message.chat.type == 'private') return;
 	let chat_id = ctx.message.chat.id;
@@ -53,7 +59,7 @@ bot.command('stop', ctx => {
 	Game.findOne({chat_id: chat_id, "user_list.user_id": user_id, game_status: {$ne: 4 }})
 		.then((game) => {
 			if(game == null) throw "No game to be closed!";
-			game.game_status = 4;
+			game.game_status = 3;
 			return game.save();
 		})
 		.then(() => ctx.reply("Game has been stopped!"))
@@ -203,6 +209,10 @@ bot.command('viewstats', ctx => {
 
 bot.command('status', ctx => {
 	Options.messageStatus(ctx.message.chat.id);
+})
+
+bot.command('forcestart', ctx => {
+	Start.startGame(ctx.message.chat.id, ctx.message.chat.title);
 })
 
 bot.action(/^cool=(.+)$/, ctx => {

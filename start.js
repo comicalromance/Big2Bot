@@ -4,11 +4,14 @@ const Markup = require('telegraf/markup');
 
 let User = require('./models/user.model');
 let Game = require('./models/game.model');
-let Options = require('./options')
+let Options = require('./options');
+let Eng = require('./game');
 let bot = require('./bot');
+let Misc = require('./misc');
 
-function startGame(ctx) {
-	let currentPlayer, hands = Eng.generateHands(4), chat_id = ctx.message.chat_id;
+function startGame(chat_id, chat_title) {
+	let currentPlayer, hands = Eng.generateHands(4);
+	let players = [];
 	Game.findOne({chat_id: chat_id, game_status: 2})
 		.then(game => {
 			if(!game) {
@@ -17,16 +20,18 @@ function startGame(ctx) {
 			}
 			for(let i=0; i<game.user_list.length; i++) {
 				game.user_list[i].user_hand = Eng.sortHand(hands[i]);
+				if(game.user_list[i].user_id.indexOf("bot") == -1) bot.telegram.sendMessage(game.user_list[i].user_id, Eng.convertHandToString(game.user_list[i].user_hand), {parse_mode: 'HTML'});
 				if(!game.current_user && Eng.find3Dim(hands[i])) {
 					game.current_user = i;
-					currentPlayer = {"user_id": game.user_list[i].user_id, "user_name": game.user_list[i].user_name}
+					currentPlayer = {"user_id": game.user_list[i].user_id, "user_name": game.user_list[i].user_name, "user_hand": game.user_list[i].user_hand};
 				}
+				players = game.user_list;
 			}
-			Options.startTurn(ctx.message.chat_title, chat_id, currentPlayer.user_id, 
-				currentPlayer.user_name, game.user_list[game.current_user].user_hand, game.user_list);
-			game.save();
+			return game.save();
 		})
 		.then(() => {
+			Options.startTurn(chat_title, chat_id, currentPlayer.user_id, 
+				currentPlayer.user_name, currentPlayer.user_hand, players);
 			bot.telegram.sendMessage(chat_id, `The starting player is <a href="tg://user?id=${currentPlayer.user_id}">${currentPlayer.user_name}</a>!`, {parse_mode: 'HTML'});
 		})
 		.catch(err => console.log(err));
@@ -91,6 +96,7 @@ function addBot(ctx) {
 	let user_id = 'bot' + Math.floor(Math.random()*100000);
 	let user_name = user_id;
 	let chat_id = ctx.message.chat.id;
+	let chat_title;
 	let total_wins = 0;
 	let game_start = false;
 
@@ -123,9 +129,9 @@ function addBot(ctx) {
 		})
 		.then(() => {
 			bot.telegram.sendMessage(chat_id, `${user_name} has joined the game!`, {parse_mode: 'HTML'});
-			listPlayers(chat_id);
+			Misc.listPlayers(chat_id);
 		})
-		.then(() => {if(game_start) Start.startGame(ctx);})
+		.then(() => {if(game_start) startGame(chat_id, chat_title);})
 		.catch(err => console.log(err));
 }
 
@@ -178,9 +184,9 @@ function hearStart(ctx) {
 		.then(() => {
 			ctx.replyWithHTML(`Joined game in <b>${chat_title}!</b>`);
 			bot.telegram.sendMessage(chat_id, `<a href="tg://user?id=${user_id}">${user_name}</a> has joined the game!`, {parse_mode: 'HTML'});
-			listPlayers(chat_id);
+			Misc.listPlayers(chat_id);
 		})
-		.then(() => {if(game_start) Start.startGame(ctx);})
+		.then(() => {if(game_start) startGame(chat_id, chat_title);})
 		.catch(err => console.log(err));
 }
 

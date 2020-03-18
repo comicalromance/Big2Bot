@@ -14,6 +14,7 @@ const userSchema = new Schema({
 			action: String,
 			number: Number,
 			suit: String,
+			txt: String,
 			s3t: [{
 				number: Number,
 				suit: String
