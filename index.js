@@ -102,6 +102,10 @@ bot.command('join', ctx => {
 		.catch(err => console.log(err));
 });
 
+bot.command('addbot', ctx => {
+	Start.addBot(ctx);
+})
+
 bot.command('whack', ctx => {
 	if(ctx.message.chat.type == 'private') return;
 
@@ -213,11 +217,15 @@ bot.action(/^cool=(.+)$/, ctx => {
 			if(action.split(" ")[0] == "play") {
 				let index = action.split(" ")[1];
 				for(let option of user.menu[0].options) {
-					if(index == option._id) return Options.playOption(user.menu[0].chat_id, user.menu[0].chat_title, user_id, user_name, option);
+					if(index == option._id) {
+						ctx.editMessageReplyMarkup({inline_keyboard: [[]]});
+						return Options.playOption(user.menu[0].chat_id, user.menu[0].chat_title, user_id, user_name, option);
+					}
 				}
 				throw("Couldn't find option");
 			}
 			else if(action == "pass") {
+				ctx.editMessageReplyMarkup({inline_keyboard: [[]]});
 				return Options.playOption(user.menu[0].chat_id, user.menu[0].chat_title, user_id, user_name, "", true);
 			}
 			else {

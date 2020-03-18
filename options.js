@@ -103,6 +103,10 @@ function startTurn(chat_title, chat_id, user_id, user_name, hand = [], players =
 		.then(() => { return User.findOne({user_id: user_id}, {menu: { $elemMatch: {chat_id: chat_id} } }) })
 		.then(user => {
 			let options = user.menu[0].options; usr = user;
+			if(user_id.indexOf('bot') != -1) {
+				return playRandom(chat_id, chat_title, user_id, user_name, options)
+					.then(() => {throw "bot plays"})
+			}
 			if(!set.length) {
 				keyboard = formatKeyboard(options, 'start');
 				return bot.telegram.sendMessage(user_id, "Pick an option!", {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
@@ -119,9 +123,23 @@ function startTurn(chat_title, chat_id, user_id, user_name, hand = [], players =
         .catch(err => console.log(err));
 }
 
-function playOption(chat_id, chat_title, user_id, user_name, options, pass = false) {
+function playRandom(chat_id, chat_title, user_id, user_name, options, pass = false) {
+	let randIndex = Math.floor(Math.random() * (options.length + 1));
+	if(randIndex == options.length) {
+		playOption(chat_id, chat_title, user_id, user_name, "", true)
+	}
+	else {
+		playOption(chat_id, chat_title, user_id, user_name, options[randIndex]);
+	}
+}
+
+function playOption(chat_id, chat_title, user_id, user_name, options = [], pass = false) {
 	Game.findOne({chat_id: chat_id, game_status: 2})
 		.then(game => {
+			if(game.user_list[game_current_user].user_id != user_id) {
+				bot.telegram.sendMessage(user_id, "Not your turn!");
+				throw "not your turn!";
+			}
 			if(!pass) {
                 game.current_set = options;
                 game.last_played = options.s3t;

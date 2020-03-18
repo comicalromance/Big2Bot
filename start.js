@@ -87,11 +87,53 @@ function handleStart(ctx) {
 	}
 }
 
+function addBot(ctx) {
+	let user_id = 'bot' + Math.floor(Math.random()*100000);
+	let user_name = user_id;
+	let chat_id = ctx.message.chat.id;
+	let total_wins = 0;
+	let game_start = false;
+
+	const newUser = new User({
+		user_id,
+		total_wins
+	})
+	newUser.save()
+	Game.findOne({chat_id: chat_id, game_status: {$ne: 3} })
+		.then(games => {
+			if(games == null) {
+				ctx.reply("No ongoing game!");
+				throw("No ongoing game");
+			}
+			chat_title = games.chat_title;
+			if(games.game_status != 1) {
+				ctx.reply(`Unable to add bot in ${chat_title}!`);
+				throw("Unable to add bot!");
+			}
+			else {
+				let user_hand = [];
+				const list = {"user_id": user_id, "user_name": user_name, "user_hand": user_hand};
+				games.user_list.push(list);
+				if(games.user_list.length == 4) {
+					games.game_status = 2;
+					game_start = true;
+				}
+				return games.save();
+			}
+		})
+		.then(() => {
+			bot.telegram.sendMessage(chat_id, `${user_name} has joined the game!`, {parse_mode: 'HTML'});
+			listPlayers(chat_id);
+		})
+		.then(() => {if(game_start) Start.startGame(ctx);})
+		.catch(err => console.log(err));
+}
+
 function hearStart(ctx) {
     let user_id = ctx.message.from.id;
 	let user_name = ctx.message.from.first_name + " " + ctx.message.from.last_name;
 	let chat_id = ctx.match[1];
-	let chat_title = ctx.message.from.id;
+	let chat_title;
 	let total_wins = 0;
 	let game_start = false;
 
@@ -100,14 +142,12 @@ function hearStart(ctx) {
 			if(!users) {
 				const newUser = new User({ 
 					user_id, 
-					chat_id, 
-					chat_title,
 					total_wins
 				});
 				return newUser.save();
 			}
 		})
-		.then(() => {return Game.findOne({chat_id: chat_id, game_status: {$ne: 4} }) } )
+		.then(() => {return Game.findOne({chat_id: chat_id, game_status: {$ne: 3} }) } )
 		.then(games => {
 			if(games == null) {
 				ctx.reply("No ongoing game!");
@@ -144,4 +184,4 @@ function hearStart(ctx) {
 		.catch(err => console.log(err));
 }
 
-module.exports = {startGame, handleStart, hearStart}
+module.exports = {startGame, handleStart, hearStart, addBot}
