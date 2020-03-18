@@ -4,6 +4,7 @@ const Markup = require('telegraf/markup');
 
 let User = require('./models/user.model');
 let Game = require('./models/game.model');
+let Options = require('./options')
 let bot = require('./bot');
 
 function startGame(ctx) {
@@ -21,6 +22,8 @@ function startGame(ctx) {
 					currentPlayer = {"user_id": game.user_list[i].user_id, "user_name": game.user_list[i].user_name}
 				}
 			}
+			Options.startTurn(ctx.message.chat_title, chat_id, currentPlayer.user_id, 
+				currentPlayer.user_name, game.user_list[game.current_user].user_hand, game.user_list);
 			game.save();
 		})
 		.then(() => {

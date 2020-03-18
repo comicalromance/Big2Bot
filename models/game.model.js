@@ -12,6 +12,10 @@ const gameSchema = new Schema({
 		user_hand: [{
 			number: Number,
 			suit: String
+		}],
+		last_played: [{
+			number: Number,
+			suit: String
 		}]
 	}],
 	current_user: Number,

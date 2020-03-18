@@ -330,13 +330,14 @@ function generateKeyboard(options, type) {
         else {
             results = generateSetsKeyboard(options);
         }
+        results.push({text: "<<", action: "start"});
     }
     else if(type == "start") {
 		results = generateStartingKeyboard(options);
 	}
 	else if(type == "single") {
         results = options.filter(option => option.settype == "single");
-        results.push({text: "<<", action: "start"})
+        results.push({text: "<<", action: "start"});
 	}
 	else if(type == "pair") {
         results = options.filter(option => option.settype == "pair");
@@ -344,7 +345,7 @@ function generateKeyboard(options, type) {
 	}
 	else if(type == "set") {
         results = generateSetsKeyboard(options);
-        if(results.length != options.length) results.push({text: "<<", action: "start"})
+        if(options.length && options[0].settype == 'single') results.push({text: "<<", action: "start"})
         else results.push({text: "Pass", action: "pass"});
     }
     else {
