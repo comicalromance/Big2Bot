@@ -112,28 +112,6 @@ bot.command('addbot', ctx => {
 	Start.addBot(ctx);
 })
 
-bot.command('whack', ctx => {
-	if(ctx.message.chat.type == 'private') return;
-
-	let chat_id = ctx.message.chat.id;
-	let chat_title = ctx.message.chat.title;
-	Misc.getPlayerList(chat_id)
-		.then((options) => {
-			if(options.length == 1) ctx.reply(options[0]);
-			else {
-				bot.telegram.sendPoll(chat_id, "Who to Whack?", JSON.stringify(options))
-					.then(poll => {
-						const npoll = {"poll_id": poll.poll.id, "message_id": poll.message_id};
-						return Game.update({chat_id: chat_id, game_status: 2}, {poll: npoll})
-					})
-					.then(() => {
-						console.log("Saved Poll Data");
-					})
-					.catch(err => console.log(err));
-			}
-		})
-})
-
 bot.command('testreply', ctx => {
 	let keyboard = [], current_set, usr;
 	let user_id = ctx.message.from.id;
@@ -141,60 +119,6 @@ bot.command('testreply', ctx => {
 	let chat_id = ctx.message.chat.id;
 	let user_name = ctx.message.from.first_name + " " + ctx.message.from.last_name;
 	Options.startTurn(chat_title, chat_id, user_id, user_name);
-})
-
-bot.on('poll', ctx =>  {
-	let chat_id = 0, winner, max = 0, totalWhacked = 0, updates = [];
-	if(ctx.poll.total_voter_count == ctx.poll.options.length) {
-		let options = ctx.poll.options;
-		const whacked_name = Misc.findMostVoted(options);
-		Game.findOne({"poll.poll_id": ctx.poll.id, game_status: 2})
-			.then(game => {
-				if(game == null) throw("No polling game");
-				chat_id = game.chat_id;
-			})
-			.then(() => {
-				bot.telegram.sendMessage(chat_id, `The whacked person is ${whacked_name}!`);
-				return Game.update({chat_id: chat_id, game_status: 2}, {game_status: 3});
-			})
-			.then(() => {
-				bot.telegram.sendMessage(chat_id, "Let the whacking begin!", Markup.inlineKeyboard([
-					Markup.callbackButton('Whack!', 'whack')
-				]).extra());
-				return new Promise(resolve => {
-					setTimeout(() => resolve("done!"), 10000);
-				});
-			})
-			.then(() => {
-				return Game.findOne({chat_id: chat_id, game_status: 3})
-					.then(game => {
-						game.game_status = 4;
-						for(const i of game.user_list) {
-							updates.push({"user_id": i["user_id"], "user_whacked": i["user_whacked"]});
-							totalWhacked += i["user_whacked"];
-							if(i["user_whacked"] > max) {
-								max = i["user_whacked"];
-								winner = i["user_name"];
-							}
-						}
-						return game.save();
-					}) 
-			})
-			.then(() => {
-				bot.telegram.sendMessage(chat_id, "Time is up!");
-				bot.telegram.sendMessage(chat_id, `Total whacks: ${totalWhacked}`);
-				bot.telegram.sendMessage(chat_id, `Most whacks: ${winner} at ${max} whacks!`);
-			})
-			.then(() => {
-				let bulkUpdate = User.collection.initializeUnorderedBulkOp();
-				for(const i of updates) {
-					bulkUpdate.find({user_id: i["user_id"]}).updateOne({$inc: {total_whacks: parseInt(i["user_whacked"])}});
-				}
-				return bulkUpdate.execute()
-			})
-			.then(() => console.log("executed!"))
-			.catch(err => console.log(err));
-	}
 })
 
 bot.command('viewstats', ctx => {

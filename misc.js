@@ -13,7 +13,6 @@ function listPlayers(chat_id) {
 			}
 			for(const i of game.user_list) {
 				msg += `<a href="tg://user?id=${i.user_id}">${i.user_name}</a><pre>\n</pre>`;
-				console.log(i["user_name"]);
             }
 			bot.telegram.sendMessage(chat_id, msg, {parse_mode: 'HTML'});
 		})

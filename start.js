@@ -173,6 +173,7 @@ function hearStart(ctx) {
 					let user_hand = [];
 					const list = {"user_id": user_id, "user_name": user_name, "user_hand": user_hand};
 					games.user_list.push(list);
+					console.log(games.user_list);
 					if(games.user_list.length == 4) {
 						games.game_status = 2;
 						game_start = true;

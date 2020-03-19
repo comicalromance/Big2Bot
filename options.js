@@ -9,7 +9,6 @@ let bot = require('./bot');
 
 function compactKeyboard(options, set = false) {
 	return_keyboard = [], keyboard = options.slice(0), temp = [];
-	console.log(options);
 	while(keyboard[keyboard.length-1].txt == 'Pass' || keyboard[keyboard.length-1].txt == '<<') temp.push(keyboard.pop());
     while(keyboard.length) {
         if(set) return_keyboard.push(keyboard.splice(0, 2));
@@ -50,7 +49,6 @@ function messageStatus(chat_id, user_id, user_name, players = []) {
         let text = `<b>Players:</b> <pre>\n</pre><pre>\n</pre>`;
         for(let user of players) {
 			text += `<a href="tg://user?id=${user.user_id}">${user.user_name}</a> (${user.user_hand.length} cards left): `;
-			//console.log(user.last_played);
             if(user.last_played && user.last_played.length && user.last_played[0].suit == 'passed') text += `<b>Passed</b><pre>\n</pre>`;
             else text += `${Eng.convertToString(user.last_played)}<pre>\n</pre>`;
         }
