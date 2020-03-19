@@ -60,7 +60,7 @@ function messageStatus(chat_id, user_id, user_name, players = []) {
         Game.findOne({chat_id: chat_id, game_status: 2})
             .then(game => {
 				if(!game) {
-					bot.telegram.sendMessage(chat_id, "No game in progress!")
+					//bot.telegram.sendMessage(chat_id, "No game in progress!")
 					throw "No game in progress";
 				}
                 players = game.user_list;
@@ -168,7 +168,8 @@ function playOption(chat_id, chat_title, user_id, user_name, options = [], pass 
 					if(user.user_id == user_id) {
                         user.user_hand = Eng.removeCards(user.user_hand, options.s3t);
                         if(user.user_hand.length == 0) {
-                            game.game_status = 3;
+							game.game_status = 3;
+							bot.telegram.sendMessage(chat_id,`<a href="tg://user?id=${user_id}">${user_name}</a> has played ${Eng.convertToString(options.s3t)}`, {parse_mode: 'HTML'});
                             bot.telegram.sendMessage(chat_id, `<b>Player <a href="tg://user?id=${user_id}">${user_name}</a> has won!</b>`, {parse_mode: 'HTML'})
                             return game.save();
                         }

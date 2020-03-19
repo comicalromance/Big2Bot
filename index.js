@@ -46,11 +46,11 @@ bot.hears(/^\/start[ =](.+)$/, ctx => Start.hearStart(ctx));
 
 bot.command('start', ctx => Start.handleStart(ctx));
 
-/*bot.command('viewhand', ctx => {
+bot.command('viewhand', ctx => {
 	let chat_id = ctx.message.chat.id;
 	let user_id = ctx.message.user.id;
 	Misc.viewHand(chat_id, user_id);
-})*/
+})
 
 bot.command('stop', ctx => {
 	if(ctx.message.chat.type == 'private') return;

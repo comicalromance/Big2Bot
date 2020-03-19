@@ -27,6 +27,7 @@ function viewHand(chat_id, user_id) {
 		})
 		.catch(err => console.log(err))
 }
+
 function getPlayerList(chat_id) {
 	let arr = [];
 	return Game.findOne({chat_id: chat_id, game_status: {$ne: 4}})

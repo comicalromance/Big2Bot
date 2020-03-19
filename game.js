@@ -291,7 +291,7 @@ function generateStartingKeyboard(options) {
             break;
         }
     }
-    for(index; index < options.length; index++) {
+    for(index = 0; index < options.length; index++) {
         if(options[index].settype != "pair" && options[index].settype != "single") {
             optionsKeyboard.push({txt: "Play Sets", action: "set"});
             break;
