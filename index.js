@@ -2,10 +2,8 @@ const Telegraf = require("telegraf");
 const Extra = require('telegraf/extra')
 const Markup = require('telegraf/markup')
 const Express = require("express")
-
 const mongoose = require("mongoose");
 const dotenv = require("dotenv");
-dotenv.config();
 
 let User = require('./models/user.model');
 let Game = require('./models/game.model');
@@ -14,6 +12,9 @@ let Options = require('./options');
 let Start = require('./start');
 let Misc = require('./misc');
 let bot = require('./bot');
+let client = require('./client');
+
+dotenv.config();
 
 const db_uri = process.env.ATLAS_URI;
 mongoose.connect(db_uri, {useNewUrlParser: true, useCreateIndex: true });
@@ -72,41 +73,9 @@ bot.command('listplayers', ctx => {
 	Misc.listPlayers(chat_id);
 })
 
-bot.command('join', ctx => {
-	//ctx.answerCbQuery('');
-	if(ctx.message.chat.type == 'private') return;
+bot.command('options', ctx => Start.startOptions(ctx));
 
-	let chat_id = ctx.message.chat.id;
-	let chat_title = ctx.message.chat.title;
-	let user_id = ctx.message.from.id;
-	let user_name = ctx.message.from.first_name + " " + ctx.message.from.last_name;
-	let user_hand = [];
-	let game_start = false;
-
-	Game.findOne({chat_id: chat_id, game_status: 1})
-		.then(games => {
-			if(games == null) {
-				ctx.reply("No ongoing game!");
-				throw("No ongoing game");
-			}
-			else if(games.game_status != 1) {
-				ctx.reply("Unable to join game!");
-				throw("Unable to join game!");
-			}
-			else {
-				if(Misc.checkUserinList(games.user_list, user_id)) {
-					ctx.reply("Already in Game!");
-					throw("Already in Game!");
-				}
-				else {
-					ctx.replyWithHTML("Join the game of <b>Big2</b> by pressing Start below!", Markup.inlineKeyboard([
-						Markup.urlButton('Start', `https://t.me/SGBig2Bot?start=${chat_id}`)
-					]).extra());
-				}
-			}
-		})
-		.catch(err => console.log(err));
-});
+bot.action(/options=(.+)$/, ctx => Start.hearOptions(ctx));
 
 bot.command('addbot', ctx => {
 	Start.addBot(ctx);

@@ -6,6 +6,7 @@ let User = require('./models/user.model');
 let Game = require('./models/game.model');
 let Eng = require('./game');
 let bot = require('./bot');
+let client = require('./client');
 
 function compactKeyboard(options, set = false) {
 	return_keyboard = [], keyboard = options.slice(0), temp = [];
@@ -98,17 +99,29 @@ function generateOptions(chat_id, user_id, hand = [], current_set = {}) {
 	}
 }
 
-function startTurn(chat_title, chat_id, user_id, user_name, hand = [], players = [], set = {}) {
+function autoPass(chat_title, chat_id, user_id, user_name, turn) {
+	client.get(chat_id, function(err, reply) {
+		let redisTurn = reply;
+		if(redisTurn == turn) {
+			return playOption(chat_id, chat_title, user_id, user_name, "", true)
+				.then(() => {throw "auto passed (afk)"})
+				.catch(err => console.log(err));
+		}
+	});
+}
+
+function startTurn(chat_title, chat_id, user_id, user_name, hand = [], players = [], set = {}, game_options) {
 	messageStatus(chat_id, user_id, user_name, players);
-	//let genO = new Promise(function(resolve, reject) {
-	//	return generateOptions(chat_id, user_id, hand, set);
-	//})
 	let gen0 = generateOptions(chat_id, user_id, hand, set);
 	let _msg;
 	gen0.then(options => {
+			if(game_options.autopass == 'Strict' && options.length == 0) {
+				return playOption(chat_id, chat_title, user_id, user_name, "", true)
+					.then(() => {throw "auto passed (no cards)"});
+			}
 			return updateOptions(chat_title, chat_id, user_id, options);
 		})
-	.then((hi) => { 
+	.then(() => { 
 			return User.findOne({user_id: user_id}, {menu: { $elemMatch: {chat_id: chat_id} } }) 
 		})
 		.then(user => {
@@ -117,6 +130,14 @@ function startTurn(chat_title, chat_id, user_id, user_name, hand = [], players =
 				return playRandom(chat_id, chat_title, user_id, user_name, options)
 					.then(() => {throw "bot plays"})
 			}
+
+			if(game_options.timer) {
+				Game.findOne({chat_id: chat_id, game_status: 2})
+					.then(game => {
+						setTimeout(autoPass, game_options.timer * 1000, chat_title, chat_id, user_id, user_name, game.turns_played);
+					});
+			}
+
 			if(!set.settype) {
 				keyboard = formatKeyboard(options, 'start');
 				return bot.telegram.sendMessage(user_id, "Pick an option!", {reply_markup: Markup.inlineKeyboard(keyboard, {selective: true}), parse_mode: 'HTML'})
@@ -152,15 +173,18 @@ function playRandom(chat_id, chat_title, user_id, user_name, options, pass = fal
 }
 
 function playOption(chat_id, chat_title, user_id, user_name, options = [], pass = false) {
-	let next_user, next_username, next_index, next_hand, players, current_set;
+	let next_user, next_username, next_index, next_hand, players, current_set, game_options;
 	return Game.findOne({chat_id: chat_id, game_status: 2})
 		.then(game => {
 			if(game.user_list[game.current_user].user_id != user_id) {
 				bot.telegram.sendMessage(user_id, "Not your turn!");
 				throw "not your turn!";
 			}
+			game_options = game.options;
+			game.turns_played++;
+			client.set(chat_id, game.turns_played);
 			if(!pass) {
-                game.current_set = options;
+				game.current_set = options;
                 game.user_list[game.current_user].last_played = options.s3t;
                 game.winning_user = game.current_user;
 				game.times_passed = 0;
@@ -210,7 +234,7 @@ function playOption(chat_id, chat_title, user_id, user_name, options = [], pass 
 			return game.save();
 		})
 		.then(() => {
-			startTurn(chat_title, chat_id, next_user, next_username, next_hand, players, current_set);
+			startTurn(chat_title, chat_id, next_user, next_username, next_hand, players, current_set, game_options);
 		})
 		.catch(err => console.log(err));
 }

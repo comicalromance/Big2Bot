@@ -5,7 +5,7 @@ const Schema = mongoose.Schema;
 const gameSchema = new Schema({
 	chat_id: { type: String, required: true},
 	chat_title: {type: String, required: true},
-	game_status: {type: Number, required: true}, //0 = closed, 1 = waiting for people, 2 = ongoing
+	game_status: {type: Number, required: true}, //3 = closed, 1 = waiting for people, 2 = ongoing
 	user_list: [{
 		user_id: String,
 		user_name: String,
@@ -28,6 +28,11 @@ const gameSchema = new Schema({
 			suit: String
 		}]
 	},
+	options: {
+		timer: Number,
+		autopass: String
+	},
+	turns_played: Number,
 	times_passed: Number,
 	winning_user: Number
 }, {
